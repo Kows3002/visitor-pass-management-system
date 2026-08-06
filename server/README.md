@@ -38,6 +38,15 @@ CLIENT_URL=http://localhost:5173
 
 Do not commit `.env`. Use HTTPS in production so the authentication cookie can be transported securely.
 
+For the deployed Render API, use the exact frontend origin without a path:
+
+```dotenv
+NODE_ENV=production
+CLIENT_URL=https://visitor-pass-management-system-five.vercel.app
+```
+
+After changing a Render environment variable, redeploy or restart the service. The production authentication cookie uses `Secure; SameSite=None` because the Vercel and Render hosts are different sites; the CORS allowlist remains exact and credentialed.
+
 ## Initial administrator
 
 `npm run seed` creates or repairs the required initial administrator without creating sample operational data:
@@ -208,4 +217,3 @@ npm test                       run Node tests
 ```
 
 Run the employee-link migration only when upgrading older data that predates bidirectional User/Employee references. Back up production data before any migration.
-

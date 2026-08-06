@@ -122,6 +122,21 @@ Client (`client/.env`):
 
 Never commit real secrets or production database credentials. Production must use HTTPS and a unique high-entropy JWT secret.
 
+### Vercel and Render deployment
+
+For a Vercel client and Render API, configure these exact values and redeploy both services:
+
+```text
+Vercel / client:
+VITE_API_URL=https://visitor-pass-management-system-b4pv.onrender.com/api
+
+Render / server:
+NODE_ENV=production
+CLIENT_URL=https://visitor-pass-management-system-five.vercel.app
+```
+
+`CLIENT_URL` may contain multiple comma-separated frontend origins when intentional. Do not add a route such as `/login` or `/api` to it. The server normalizes a harmless trailing slash, but the hostname and scheme must match the browser origin. Cross-site production sessions use an HTTP-only `Secure; SameSite=None` cookie and credentialed CORS.
+
 ## Useful commands
 
 Run these inside the relevant folder:
@@ -154,4 +169,3 @@ See [server/README.md](server/README.md) for roles, parameters, and endpoint det
 - **Login fails after changing JWT settings:** clear the old authentication cookie and sign in again.
 - **Employee is unavailable during registration:** ensure the Employee record is active, has a department, and is linked to an active Employee user account.
 - **Seed cannot connect:** verify `MONGODB_URI` and confirm the database service is running.
-

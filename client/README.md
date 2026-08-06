@@ -17,6 +17,14 @@ npm run dev
 
 The development server opens at `http://localhost:5173` by default. Start the API separately before signing in.
 
+For the deployed Vercel client, set:
+
+```dotenv
+VITE_API_URL=https://visitor-pass-management-system-b4pv.onrender.com/api
+```
+
+Changing a Vite environment variable requires a new Vercel deployment. `vercel.json` preserves React Router pages such as `/login` and `/dashboard/admin` when they are opened or refreshed directly.
+
 ## Environment
 
 `client/.env` contains the browser-safe API location:
@@ -80,4 +88,3 @@ npm run lint
 - Keep labels explicit and preserve visible keyboard focus.
 - Use status colors semantically, not decoratively.
 - Keep role actions available only where both the route and API permit them.
-
