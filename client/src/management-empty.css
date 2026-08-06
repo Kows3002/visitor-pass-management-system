@@ -1,0 +1,1 @@
+.management-table .empty b{font-size:0}.management-table .empty b::after{content:'No people match this view';font-size:12px}.management-table .empty p{font-size:0}.management-table .empty p::after{content:'Adjust the filters or add a user or employee record.';font-size:11px}

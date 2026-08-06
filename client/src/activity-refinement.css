@@ -1,0 +1,15 @@
+.audit-summary article em{display:block;margin-top:2px;color:#7b8190;font-size:10px;font-style:normal;font-weight:600;letter-spacing:.01em}
+
+.audit-action.created{background:#eaf2ff;color:#2764a3}
+.audit-action.approved{background:#e8f6ee;color:#27734c}
+.audit-action.rejected{background:#fdeced;color:#a63f48}
+.audit-action.checked_in{background:#eeedff;color:#5146b8}
+.audit-action.checked_out{background:#f3ecff;color:#7549a8}
+.audit-action.user_created{background:#fff1df;color:#9b5a14}
+.audit-action.login{background:#f1f2f4;color:#62656c}
+
+.audit-row.repeated-login{background:#fafafa;color:#737781}
+.audit-row.repeated-login>td{opacity:.68}
+.audit-row.repeated-login:hover>td,.audit-row.repeated-login.expanded>td{opacity:.86}
+.audit-row.repeated-login .audit-action.login{background:#f5f5f6;color:#858991}
+.audit-row.repeated-login .audit-user>span{background:#f0f1f2;color:#7d818a}

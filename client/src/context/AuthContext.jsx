@@ -1,0 +1,3 @@
+import{useEffect}from'react';import{useDispatch,useSelector}from'react-redux';import{fetchProfile,loginUser,logoutUser,sessionExpired}from'../store/authSlice';
+export function AuthProvider({children}){const dispatch=useDispatch();useEffect(()=>{dispatch(fetchProfile());const expired=()=>dispatch(sessionExpired());window.addEventListener('auth:expired',expired);return()=>window.removeEventListener('auth:expired',expired)},[dispatch]);return children}
+export function useAuth(){const dispatch=useDispatch();const{user,status,initialized,error}=useSelector(state=>state.auth);return{user,loading:!initialized||status==='loading',error,login:values=>dispatch(loginUser(values)).unwrap(),logout:()=>dispatch(logoutUser()).unwrap(),refresh:()=>dispatch(fetchProfile()).unwrap()}}

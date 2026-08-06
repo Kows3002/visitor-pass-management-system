@@ -1,0 +1,1 @@
+const labels={checked_in:'Inside',checked_out:'Checked out',pending:'Pending',approved:'Approved',rejected:'Rejected',cancelled:'Cancelled'};export default function StatusBadge({status}){return <span className={`status ${status}`}><i/>{labels[status]||status}</span>}

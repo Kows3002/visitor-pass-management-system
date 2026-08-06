@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">Visitor Pass VP app icon</title>
+  <rect width="256" height="256" rx="52" fill="#1E3A5F"/>
+  <path d="M51 57h35l42 93 25-55h34l-43 98h-32z" fill="#fff"/>
+  <path d="M128 57h52c28 0 45 16 45 40 0 25-17 42-45 42h-24l14-31h8c9 0 14-4 14-11 0-6-5-10-14-10h-64z" fill="#10B981"/>
+  <path d="M128 57v93l16 43 12-27V87h22c9 0 14 4 14 10 0 7-5 11-14 11h-8l-14 31h24c28 0 45-17 45-42 0-24-17-40-45-40z" fill="#10B981" opacity=".98"/>
+</svg>

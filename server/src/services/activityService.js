@@ -1,0 +1,1 @@
+const ActivityLog=require('../models/ActivityLog'); exports.record=(req,action,visitor,remarks,metadata)=>ActivityLog.create({visitor,action,remarks,metadata,performedBy:req.user._id,role:req.user.role,ipAddress:req.ip});

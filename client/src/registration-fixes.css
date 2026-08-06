@@ -1,0 +1,1 @@
+.floating-field:focus-within>span,.floating-field:has(input:not(:placeholder-shown))>span,.floating-field:has(input[type=date])>span,.floating-field:has(input[type=time])>span{top:-6px;left:10px;font-size:8px;color:var(--brand)}

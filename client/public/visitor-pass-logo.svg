@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 144" role="img" aria-labelledby="title desc">
+  <title id="title">Visitor Pass Management System</title><desc id="desc">Geometric VP monogram and wordmark</desc>
+  <style>.logo-text{fill:#1E3A5F}@media(prefers-color-scheme:dark){.logo-text{fill:#fff}}</style>
+  <rect x="8" y="8" width="128" height="128" rx="28" fill="#1E3A5F"/>
+  <path d="M31 36h18l23 52 14-31h18L80 112H63z" fill="#fff"/>
+  <path d="M72 36h28c16 0 25 9 25 22 0 14-9 23-25 23H87l8-17h4c5 0 8-2 8-6s-3-6-8-6H64z" fill="#10B981"/>
+  <text class="logo-text" x="166" y="67" font-family="Inter,Manrope,Arial,sans-serif" font-size="36" font-weight="600" letter-spacing="-.8">Visitor Pass</text>
+  <text class="logo-text" x="167" y="99" font-family="Inter,Manrope,Arial,sans-serif" font-size="18" font-weight="500" letter-spacing="2.2">MANAGEMENT SYSTEM</text>
+</svg>

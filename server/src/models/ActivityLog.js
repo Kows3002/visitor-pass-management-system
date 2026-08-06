@@ -1,0 +1,3 @@
+const mongoose=require('mongoose');
+const schema=new mongoose.Schema({visitor:{type:mongoose.Schema.Types.ObjectId,ref:'Visitor',index:true},action:{type:String,enum:['created','approved','rejected','cancelled','checked_in','checked_out','remarks_added','login','password_changed','user_created','user_deleted'],required:true,index:true},performedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true,index:true},role:{type:String,enum:['administrator','receptionist','employee'],required:true,index:true},ipAddress:String,remarks:{type:String,trim:true,maxlength:1000},metadata:mongoose.Schema.Types.Mixed},{timestamps:true});
+schema.index({createdAt:-1,performedBy:1});schema.index({action:1,createdAt:-1});module.exports=mongoose.model('ActivityLog',schema);
