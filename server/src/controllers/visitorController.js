@@ -4,6 +4,7 @@ const User = require('../models/User')
 const Activity = require('../models/ActivityLog')
 const service = require('../services/visitorService')
 const activity = require('../services/activityService')
+const notifications = require('../services/notificationService')
 const AppError = require('../utils/appError')
 const { queryDateRange } = require('../utils/dateRange')
 const { ok, created } = require('../utils/response')
@@ -89,6 +90,15 @@ exports.action = action => async (req, res, next) => {
     const item = await service.transition(req.params.id, action, req.user, remarks)
     const actionName = { approve: 'approved', reject: 'rejected', cancel: 'cancelled', checkin: 'checked_in', checkout: 'checked_out' }[action]
     await activity.record(req, actionName, item._id, remarks)
-    ok(res, item, `Visitor ${actionName.replace('_', ' ')}`)
+    let notification
+    if (['approve', 'reject'].includes(action)) {
+      await item.populate('employee', 'name email')
+      await item.populate('department', 'name code')
+      notification = await notifications.sendDecisionNotification(item, actionName)
+    }
+    const message = notification?.status === 'not_delivered'
+      ? `Visitor ${actionName}, but no notification was delivered. Check notification configuration and server logs.`
+      : `Visitor ${actionName.replace('_', ' ')}`
+    ok(res, item, message, notification ? { notification } : undefined)
   } catch (error) { next(error) }
 }

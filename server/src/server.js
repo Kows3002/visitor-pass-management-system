@@ -1,1 +1,27 @@
-require('dotenv').config();const connectDB=require('./config/db');const app=require('./app');const port=process.env.PORT||5000;if(!process.env.JWT_SECRET||!process.env.MONGODB_URI){console.error('MONGODB_URI and JWT_SECRET are required');process.exit(1)}connectDB().then(()=>app.listen(port,()=>console.log(`API listening on ${port}`))).catch(e=>{console.error(e);process.exit(1)});
+const env = require('./config/env')
+const connectDB = require('./config/db')
+const app = require('./app')
+const notifications = require('./services/notificationService')
+
+let server
+
+async function start() {
+  await connectDB()
+  await notifications.verifyConfiguration()
+  server = app.listen(env.port, () => console.log(`API listening on ${env.port}`))
+}
+
+const shutdown = signal => {
+  console.log(`${signal} received. Closing the API.`)
+  if (!server) return process.exit(0)
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(1), 10000).unref()
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
+
+start().catch(error => {
+  console.error(`${error.message}${error.code ? ` [${error.code}]` : ''}`)
+  process.exit(1)
+})

@@ -82,7 +82,7 @@ const columns = [
   { label: 'Department', key: 'department', width: 82 },
   { label: 'Purpose', key: 'purpose', width: 112 },
   { label: 'Visit Date', key: 'visitDate', width: 72 },
-  { label: 'Expected Arrival', key: 'expectedArrival', width: 69 },
+  { label: 'Visit Schedule', key: 'visitSchedule', width: 69 },
   { label: 'Check-In Time', key: 'checkedInAt', width: 87 },
   { label: 'Check-Out Time', key: 'checkedOutAt', width: 87 },
   { label: 'Status', key: 'status', width: 72 },
@@ -97,7 +97,9 @@ const rowValues = visitor => ({
   department: visitor.department?.name || '-',
   purpose: visitor.purpose || '-',
   visitDate: dateText(visitor.visitDate),
-  expectedArrival: visitor.expectedArrival || '-',
+  visitSchedule: visitor.expectedArrival
+    ? `${visitor.expectedArrival}${visitor.expectedDeparture ? ` - ${visitor.expectedDeparture}` : ''}`
+    : '-',
   checkedInAt: dateTimeText(visitor.checkedInAt),
   checkedOutAt: dateTimeText(visitor.checkedOutAt),
   status: titleCase(visitor.status),

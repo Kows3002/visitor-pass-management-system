@@ -108,6 +108,8 @@ visitor-pass-management-system/
 
 Start the local MongoDB service. If MongoDB is hosted on Atlas, copy its connection string for the server environment file.
 
+When Windows can resolve the Atlas hostname but Node reports `querySrv ECONNREFUSED` or `querySrv ETIMEOUT`, use the standard non-SRV connection string from **Atlas -> Connect -> Drivers** in the local `server/.env`. This avoids the failing Node SRV lookup. Keep `NODE_ENV=development` locally and add the computer's current public IP in Atlas **Network Access**.
+
 ### 2. Configure and start the server
 
 Open a terminal in the project directory:
@@ -168,6 +170,18 @@ MONGODB_URI=mongodb://127.0.0.1:27017/visitor_pass
 JWT_SECRET=replace-with-a-long-random-secret
 JWT_EXPIRES_IN=8h
 CLIENT_URL=http://localhost:5173
+APP_TIMEZONE=Asia/Kolkata
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=YOUR_GMAIL_ADDRESS
+SMTP_PASSWORD=YOUR_GMAIL_APP_PASSWORD
+NOTIFICATION_FROM_EMAIL=Visitor Pass <YOUR_GMAIL_ADDRESS>
+NOTIFICATION_REPLY_TO=YOUR_GMAIL_ADDRESS
+# Optional SMS
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
 ```
 
 | Variable | Required | Description |
@@ -178,6 +192,17 @@ CLIENT_URL=http://localhost:5173
 | `JWT_SECRET` | Yes | Long private value used to sign authentication tokens. |
 | `JWT_EXPIRES_IN` | No | Standard JWT duration such as `8h`. |
 | `CLIENT_URL` | Yes | Exact allowed browser origin. Multiple origins may be comma-separated. Do not include a path. |
+| `APP_TIMEZONE` | No | IANA timezone used to group dashboard analytics (defaults to `Asia/Kolkata`). |
+| `SMTP_HOST` | For email | SMTP server hostname. Use `smtp.gmail.com` for Gmail. |
+| `SMTP_PORT` | For email | SMTP port. Use `465` with secure SMTP. |
+| `SMTP_SECURE` | For email | Use `true` with Gmail SMTP port `465`. |
+| `SMTP_USER` | For email | Gmail or Google Workspace email address. |
+| `SMTP_PASSWORD` | For email | Google App Password, never the normal account password. |
+| `NOTIFICATION_FROM_EMAIL` | For email | Display name and Gmail sender address. |
+| `NOTIFICATION_REPLY_TO` | No | Address that receives replies to approval emails. |
+| `TWILIO_ACCOUNT_SID` | For SMS | Twilio account identifier. Required with the other Twilio variables. |
+| `TWILIO_AUTH_TOKEN` | For SMS | Private Twilio authentication token. |
+| `TWILIO_FROM_NUMBER` | For SMS | SMS-capable Twilio number in E.164 format. |
 
 ### Client: `client/.env`
 
@@ -199,13 +224,51 @@ Open the Render web service and configure:
 
 ```dotenv
 NODE_ENV=production
-CLIENT_URL=https://visitor-pass-management-system-five.vercel.app
+CLIENT_URL=http://localhost:5173,https://visitor-pass-management-system-five.vercel.app
 MONGODB_URI=your-mongodb-connection-string
 JWT_SECRET=your-long-private-jwt-secret
 JWT_EXPIRES_IN=8h
+APP_TIMEZONE=Asia/Kolkata
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=YOUR_GMAIL_ADDRESS
+SMTP_PASSWORD=YOUR_GMAIL_APP_PASSWORD
+NOTIFICATION_FROM_EMAIL=Visitor Pass <YOUR_GMAIL_ADDRESS>
+NOTIFICATION_REPLY_TO=YOUR_GMAIL_ADDRESS
+# Optional SMS
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
 ```
 
-`CLIENT_URL` must be the exact Vercel origin. Do not add `/login`, `/api`, or another path. Save the variables and redeploy the latest server commit.
+`CLIENT_URL` is a comma-separated allowlist. It includes the local Vite origin and the exact Vercel origin so either frontend can call the deployed API. Do not add `/login`, `/api`, quotation marks, or another path. Save the variables and redeploy the latest server commit.
+
+### Approval and rejection notifications
+
+Decision emails are sent through Gmail SMTP with Nodemailer to the email saved with the visitor registration. Enable two-step verification on the Gmail or Google Workspace account, create a Google App Password, and place that 16-character value in `SMTP_PASSWORD`. Spaces shown by Google are accepted and normalized by the server. Do not use the account's regular password. Configure `SMTP_USER`, `NOTIFICATION_FROM_EMAIL`, and `NOTIFICATION_REPLY_TO` with the same Gmail address unless your Google Workspace SMTP policy allows another sender. On startup, the server verifies SMTP and logs either `Gmail SMTP connection verified` or a safe configuration error.
+
+SMS is optional and uses Twilio. Configure all three `TWILIO_*` variables and store visitor telephone numbers in E.164 format, for example `+919876543210`. Without those variables, the approval response reports SMS as `not_configured`; the application does not claim that an SMS was sent.
+
+After changing notification variables, restart the local server or redeploy the Render service. Approve or reject a pending visitor that has a valid email address, then inspect the response `meta.notification` and the server log for the masked delivery result.
+
+Use the connection string copied from **MongoDB Atlas -> Database -> Connect -> Drivers**. Its structure should be:
+
+```text
+mongodb+srv://<database-user>:<url-encoded-password>@<exact-atlas-cluster-host>/visitor_pass?retryWrites=true&w=majority
+```
+
+Do not reuse the Atlas website account password unless it is also the password of a separately created Atlas database user. If the database password contains characters such as `@`, `:`, `/`, `?`, `#`, or `%`, URL-encode the password before placing it in the URI.
+
+In MongoDB Atlas:
+
+1. Confirm the cluster is running and is not paused or deleted.
+2. Open **Database Access** and confirm the database user exists and has access to `visitor_pass`.
+3. Open the Render service's **Connect** page and copy its outbound IP ranges.
+4. Add those outbound IP ranges in Atlas **Network Access**.
+5. Copy a fresh Node.js driver connection string from the Atlas Connect dialog into Render's `MONGODB_URI`.
+
+The application never falls back to a local MongoDB instance. When `NODE_ENV=production`, startup fails immediately if `MONGODB_URI` contains `localhost`, `127.0.0.1`, or `::1`.
 
 Verify the deployed API:
 
@@ -400,4 +463,6 @@ Typical status codes:
 - **Login fails after JWT changes:** clear the old authentication cookie and sign in again.
 - **Employee is unavailable during registration:** confirm the Employee record is active, has a department, and is linked to an active Employee user account.
 - **Seed cannot connect:** check `MONGODB_URI` and confirm MongoDB is available.
-
+- **`querySrv ECONNREFUSED` or `ETIMEOUT`:** the runtime could not resolve the Atlas SRV record. Copy a fresh driver URI from Atlas and confirm that the cluster still exists. If the exact SRV hostname is valid but DNS remains blocked, use the standard non-SRV `mongodb://` connection string offered by the Atlas Connect dialog.
+- **Atlas server-selection timeout:** add the Render service's current outbound IP ranges to the Atlas project IP Access List and confirm outbound ports `27015-27017` are permitted.
+- **Atlas authentication failure:** verify the Atlas database user and URL-encode special characters in its password.

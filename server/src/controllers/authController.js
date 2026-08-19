@@ -3,21 +3,21 @@ const User = require('../models/User')
 const ActivityLog = require('../models/ActivityLog')
 const AppError = require('../utils/appError')
 const { ok } = require('../utils/response')
+const env = require('../config/env')
 
-const isProduction = () => process.env.NODE_ENV === 'production'
 const cookieBase = () => ({
   httpOnly: true,
-  secure: isProduction(),
-  sameSite: isProduction() ? 'none' : 'lax',
+  secure: env.production,
+  sameSite: env.production ? 'none' : 'lax',
   path: '/',
 })
 const sessionDuration = remember => remember ? 30 * 86400000 : 86400000
 const sign = (user, remember) => jwt.sign(
   { sub: user._id.toString(), role: user.role, ver: user.tokenVersion },
-  process.env.JWT_SECRET,
+  env.jwtSecret,
   {
     algorithm: 'HS256',
-    expiresIn: remember ? '30d' : process.env.JWT_EXPIRES_IN || '1d',
+    expiresIn: remember ? '30d' : env.jwtExpiresIn,
     issuer: 'visitor-pass-api',
     audience: 'visitor-pass-web',
   },
