@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FiActivity, FiCalendar, FiCheck, FiChevronDown, FiChevronLeft, FiChevronRight, FiClock, FiFileText, FiKey, FiLogIn, FiSearch, FiShield, FiTrash2, FiUserPlus, FiUsers, FiX } from 'react-icons/fi'
+import { FiActivity, FiCalendar, FiCheck, FiChevronDown, FiChevronLeft, FiChevronRight, FiClock, FiDownload, FiFileText, FiKey, FiLogIn, FiSearch, FiShield, FiTrash2, FiUserPlus, FiUsers, FiX } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -84,6 +84,18 @@ export default function ActivityHistory() {
     setFilters(current => ({ ...current, search: '', role: '', from: '', to: '', page: 1 }))
     setActionCategory('')
   }
+  const exportAudit = async () => {
+    try {
+      const blob = await api.get('/activities/export/csv', { params: filters, responseType: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `activity-audit-${localDate()}.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+      toast.success('Audit report downloaded')
+    } catch (error) { toast.error(error.message || 'Audit export failed') }
+  }
   const counts = meta.actionCounts || {}
   const totalActivities = Object.values(counts).reduce((sum, value) => sum + value, 0)
   const visitorTotal = Object.entries(counts).reduce((sum, [action, value]) => sum + (visitorActions.has(action) ? value : 0), 0)
@@ -98,7 +110,7 @@ export default function ActivityHistory() {
   return <main className="audit-page">
     <header className="audit-heading">
       <div><span>Governance / Audit</span><h1>Activity History</h1><p>{user.role === 'administrator' ? 'Review workspace events, visitor decisions, and account activity from one accountable record.' : 'Review the actions performed through your account.'}</p></div>
-      <div className="audit-integrity"><FiShield /><span><b>Audit logging active</b><small>Records are stored in MongoDB</small></span></div>
+      <div className="audit-heading-actions">{user.role === 'administrator' && <button onClick={exportAudit}><FiDownload />Export audit CSV</button>}<div className="audit-integrity"><FiShield /><span><b>Audit logging active</b><small>Records are stored in MongoDB</small></span></div></div>
     </header>
     <section className="audit-summary">
       <Summary label="Total Activities" value={totalActivities} icon={FiActivity} />

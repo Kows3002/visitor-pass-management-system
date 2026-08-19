@@ -10,10 +10,13 @@ A production-oriented MERN application for managing workplace visitors from regi
 - Visitor registration with frontend and backend validation
 - Employee approval, rejection, and remarks
 - Receptionist check-in and check-out workflow
-- Role-specific dashboards using live MongoDB data
+- Role-specific dashboards with weekly/monthly trends, approval outcomes, visitor movement, top hosts, and department analytics from MongoDB
 - Visitor search, combined filters, sorting, and pagination
-- Administrator reports with PDF and Excel export
-- Complete, role-scoped activity history
+- Administrator reports with professionally formatted PDF and Excel export
+- Gmail SMTP email and optional Twilio SMS notifications for approval and rejection decisions
+- Administrator bulk approval and selected-visitor Excel export
+- Complete, role-scoped activity history with employee-management events and administrator CSV audit export
+- Server-side business-rule regression tests, centralized API responses, and query-aligned MongoDB indexes
 - Responsive light and dark interface
 
 ## Roles and permissions
@@ -108,7 +111,7 @@ visitor-pass-management-system/
 
 Start the local MongoDB service. If MongoDB is hosted on Atlas, copy its connection string for the server environment file.
 
-When Windows can resolve the Atlas hostname but Node reports `querySrv ECONNREFUSED` or `querySrv ETIMEOUT`, use the standard non-SRV connection string from **Atlas -> Connect -> Drivers** in the local `server/.env`. This avoids the failing Node SRV lookup. Keep `NODE_ENV=development` locally and add the computer's current public IP in Atlas **Network Access**.
+When Windows can resolve the Atlas hostname but Node reports `querySrv ECONNREFUSED` or `querySrv ETIMEOUT`, the server automatically retries the validated Atlas SRV and TXT records through DNS-over-HTTPS. The fallback never logs credentials and only accepts database hosts under the Atlas project domain. Keep `NODE_ENV=development` locally and add the computer's current public IP in Atlas **Network Access**.
 
 ### 2. Configure and start the server
 
@@ -193,6 +196,7 @@ TWILIO_FROM_NUMBER=
 | `JWT_EXPIRES_IN` | No | Standard JWT duration such as `8h`. |
 | `CLIENT_URL` | Yes | Exact allowed browser origin. Multiple origins may be comma-separated. Do not include a path. |
 | `APP_TIMEZONE` | No | IANA timezone used to group dashboard analytics (defaults to `Asia/Kolkata`). |
+| `DNS_OVER_HTTPS_URL` | No | HTTPS DNS endpoint used only when the runtime cannot resolve Atlas SRV records. |
 | `SMTP_HOST` | For email | SMTP server hostname. Use `smtp.gmail.com` for Gmail. |
 | `SMTP_PORT` | For email | SMTP port. Use `465` with secure SMTP. |
 | `SMTP_SECURE` | For email | Use `true` with Gmail SMTP port `465`. |
@@ -309,6 +313,13 @@ Run commands from the relevant folder:
 | `server` | `npm test` | Run server tests |
 | `client` | `npm run dev` | Start the Vite development server |
 | `client` | `npm run lint` | Run frontend lint checks |
+| `client` | `npm run build` | Create a production Vite bundle |
+
+### Automated verification
+
+`npm test` in `server` covers visitor date and time rules, duplicate and active-visit prevention, the employee pending limit, approval ownership, allowed status transitions, repeated check-in prevention, checkout ordering, atomic check-in, notification delivery states, standardized API responses, partial bulk-approval results, and audit CSV generation. Frontend changes are checked with ESLint and the Vite production build.
+
+MongoDB indexes are aligned with visitor status/date queues, employee and department reports, check-in/check-out timestamps, review timestamps, user and employee lists, and activity queries by performer, visitor, action, role, and creation time. Unique visitor identity/date indexes provide database-level duplicate protection.
 
 ## Brief API documentation
 
@@ -368,6 +379,8 @@ Login request:
 | POST | `/api/visitors/:id/cancel` | Receptionist, Administrator | Cancel a pending or approved request |
 | POST | `/api/visitors/:id/checkin` | Receptionist | Check in an approved visitor |
 | POST | `/api/visitors/:id/checkout` | Receptionist | Check out a checked-in visitor |
+| POST | `/api/visitors/bulk/approve` | Administrator | Approve up to 50 selected pending requests with per-record results |
+| POST | `/api/visitors/bulk/export` | Administrator | Export up to 500 selected visitors as an Excel workbook |
 
 Visitor list filters:
 
@@ -386,6 +399,7 @@ Free-text search covers visitor details and the host employee's name or email. E
 | GET | `/api/reports/export/pdf` | Administrator | Export the selected report as PDF |
 | GET | `/api/reports/export/excel` | Administrator | Export the selected report as Excel |
 | GET | `/api/activities` | Authenticated | Return role-scoped, paginated audit events |
+| GET | `/api/activities/export/csv` | Administrator | Export the filtered audit history as CSV |
 
 Report parameters:
 

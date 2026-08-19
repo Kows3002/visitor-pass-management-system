@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const controller = require('../controllers/visitorController');
+const bulk = require('../controllers/bulkVisitorController');
 const validate = require('../middleware/validate');
 const upload = require('../middleware/upload');
 const { authenticateUser, authorizeRoles } = require('../middleware/auth');
@@ -27,6 +28,8 @@ const listValidation = [
 
 router.use(authenticateUser);
 router.get('/', listValidation, validate, controller.list);
+router.post('/bulk/approve', authorizeRoles('administrator'), [body('ids').isArray({ min: 1, max: 50 }), body('ids.*').isMongoId(), body('remarks').optional({ checkFalsy: true }).trim().isLength({ max: 1000 })], validate, bulk.approve);
+router.post('/bulk/export', authorizeRoles('administrator'), [body('ids').isArray({ min: 1, max: 500 }), body('ids.*').isMongoId()], validate, bulk.exportExcel);
 router.get('/:id', id, validate, controller.detail);
 router.get('/:id/history', id, validate, controller.history);
 router.post('/', authorizeRoles('receptionist', 'administrator'), upload.single('photo'), [
