@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const Employee = require('../models/Employee');
 
 const SMS_ENDPOINT = 'https://api.twilio.com/2010-04-01/Accounts';
 const clean = (value) => String(value || '').trim();
@@ -102,6 +103,70 @@ async function sendEmail(visitor, decision) {
   }
 }
 
+async function sendOperationalEmail({ to, cc, subject, text, html, attachments, event, visitorId }) {
+  if (!to) return { channel: 'email', status: 'skipped', reason: 'recipient_missing' };
+  const config = smtpConfiguration();
+  if (!config) return { channel: 'email', status: 'not_configured', reason: 'smtp_configuration_missing_or_invalid' };
+  try {
+    const info = await createTransporter(config).sendMail({ from: config.from, to, cc, replyTo: clean(process.env.NOTIFICATION_REPLY_TO) || undefined, subject, text, html, attachments });
+    console.info('[notification] operational email sent', { visitorId: String(visitorId), event, recipient: maskEmail(to), provider: 'gmail-smtp', messageId: info.messageId });
+    return { channel: 'email', status: 'delivered', provider: 'gmail-smtp', messageId: info.messageId };
+  } catch (error) {
+    console.error('[notification] operational email failed', { visitorId: String(visitorId), event, recipient: maskEmail(to), provider: 'gmail-smtp', code: error.code || 'SMTP_ERROR', error: error.message });
+    return { channel: 'email', status: 'failed', provider: 'gmail-smtp', reason: error.code || 'smtp_error' };
+  }
+}
+
+async function employeeRecipient(visitor) {
+  const userId = visitor.employee?._id || visitor.employee;
+  const accountEmail = clean(visitor.employee?.email);
+  if (!userId) return { to: accountEmail };
+  try {
+    const profile = await Employee.findOne({ $or: [{ userId }, { user: userId }] }).select('email fullName status').lean();
+    const profileEmail = clean(profile?.email);
+    const to = profileEmail || accountEmail;
+    const cc = accountEmail && profileEmail && accountEmail.toLowerCase() !== profileEmail.toLowerCase() ? accountEmail : undefined;
+    if (!to) console.warn('[notification] assigned employee has no deliverable email', { visitorId: String(visitor._id), employeeId: String(userId) });
+    return { to, cc };
+  } catch (error) {
+    console.error('[notification] employee recipient lookup failed', { visitorId: String(visitor._id), employeeId: String(userId), error: error.message });
+    return { to: accountEmail };
+  }
+}
+
+const simpleMessage = (title, greeting, paragraphs) => ({
+  text: [greeting, '', ...paragraphs, '', 'Visitor Pass Management System'].join('\n'),
+  html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1f2d35;background:#f4f6f7;padding:28px"><main style="max-width:600px;margin:auto;background:white;border:1px solid #d8e0e4;padding:28px"><h1 style="font-size:22px">${escapeHtml(title)}</h1><p>${escapeHtml(greeting)}</p>${paragraphs.map((p) => `<p style="line-height:1.6">${escapeHtml(p)}</p>`).join('')}</main></body></html>`,
+});
+
+exports.sendEmployeeAssignmentAlert = async (visitor, reminder = false) => {
+  const title = reminder ? 'Visitor arrival confirmed' : 'New visitor assigned to you';
+  const content = simpleMessage(title, `Hello ${visitor.employee?.name || 'Employee'},`, [`${visitor.visitorName} has been ${reminder ? 'confirmed at reception' : 'randomly assigned to you'} for ${visitDateText(visitor)} at ${visitor.expectedArrival}.`, `Purpose: ${visitor.purpose}`, reminder ? 'Please prepare to receive the visitor.' : 'Open Visitor Requests to approve or reject this request.']);
+  const recipient = await employeeRecipient(visitor);
+  return sendOperationalEmail({ ...recipient, subject: `${title}: ${visitor.visitorName}`, ...content, event: reminder ? 'arrival_confirmed' : 'random_assignment', visitorId: visitor._id });
+};
+
+exports.sendVisitorPass = async (visitor, pdf) => {
+  const content = simpleMessage('Your visitor pass is ready', `Hello ${visitor.visitorName},`, [`Your visit with ${visitor.employee?.name || 'the host'} is approved for ${visitDateText(visitor)} at ${visitor.expectedArrival}.`, 'Your visitor pass is attached. Present it at reception when you arrive.']);
+  return sendOperationalEmail({ to: visitor.email, subject: `Visitor pass ${visitor.passNumber}`, ...content, attachments: [{ filename: `${visitor.passNumber}.pdf`, content: pdf, contentType: 'application/pdf' }], event: 'visitor_pass', visitorId: visitor._id });
+};
+
+exports.sendNextVisitNotification = (visitor) => {
+  const date = visitDateText({ visitDate: visitor.nextVisitDate });
+  const content = simpleMessage('Next visiting date scheduled', `Hello ${visitor.visitorName},`, [`Your host has scheduled your next visiting date for ${date}.`, 'Please contact reception or your host if this date is not suitable.']);
+  return sendOperationalEmail({ to: visitor.email, subject: `Next visit scheduled for ${date}`, ...content, event: 'next_visit', visitorId: visitor._id });
+};
+
+exports.sendNotArrivedNotifications = async (visitor) => {
+  const employeeContent = simpleMessage('Visitor has not arrived', `Hello ${visitor.employee?.name || 'Employee'},`, [`Reception marked ${visitor.visitorName} as not arrived for today's appointment.`, 'This is a reminder that the appointment remains recorded in the visitor history.']);
+  const visitorContent = simpleMessage('We missed you at reception', `Hello ${visitor.visitorName},`, [`Reception recorded that you did not arrive for your scheduled visit with ${visitor.employee?.name || 'your host'}.`, 'Please contact your host if you need to arrange another date.']);
+  const recipient = await employeeRecipient(visitor);
+  return Promise.all([
+    sendOperationalEmail({ ...recipient, subject: `Visitor not arrived: ${visitor.visitorName}`, ...employeeContent, event: 'not_arrived_employee', visitorId: visitor._id }),
+    sendOperationalEmail({ to: visitor.email, subject: 'Scheduled visit - arrival not confirmed', ...visitorContent, event: 'not_arrived_visitor', visitorId: visitor._id }),
+  ]);
+};
+
 async function sendSms(visitor, decision) {
   const accountSid = clean(process.env.TWILIO_ACCOUNT_SID);
   const authToken = clean(process.env.TWILIO_AUTH_TOKEN);
@@ -161,5 +226,5 @@ exports.verifyConfiguration = async () => {
 
 exports._private = {
   escapeHtml, maskEmail, maskPhone, emailContent, normalizeAppPassword,
-  setTransporterForTests(value) { transporterOverride = value; },
+  employeeRecipient, setTransporterForTests(value) { transporterOverride = value; },
 };

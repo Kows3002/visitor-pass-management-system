@@ -16,6 +16,11 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const VisitDesk = lazy(() => import('./pages/VisitDesk'));
 const Reports = lazy(() => import('./pages/Reports'));
 const ActivityHistory = lazy(() => import('./pages/ActivityHistory'));
+const OperationsSettings = lazy(() => import('./pages/OperationsSettings'));
+const VisitorPass = lazy(() => import('./pages/VisitorPass'));
+const PassVerification = lazy(() => import('./pages/PassVerification'));
+const Appointments = lazy(() => import('./pages/Appointments'));
+const EmployeeVisitorTools = lazy(() => import('./pages/EmployeeVisitorTools'));
 
 const home = { administrator: '/dashboard/admin', receptionist: '/dashboard/receptionist', employee: '/dashboard/employee' };
 const pageMeta = [
@@ -69,6 +74,7 @@ export default function App() {
       <Suspense fallback={<div className="page-loader" />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/pass/verify/:code" element={<PassVerification />} />
           <Route element={<Protected />}>
             <Route index element={<Home />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
@@ -77,10 +83,14 @@ export default function App() {
             <Route path="/dashboard/receptionist" element={<RoleRoute roles={['receptionist']}><Dashboard /></RoleRoute>} />
             <Route path="/dashboard/employee" element={<RoleRoute roles={['employee']}><Dashboard /></RoleRoute>} />
             <Route path="/users" element={<RoleRoute roles={['administrator']}><Users /></RoleRoute>} />
+            <Route path="/settings" element={<RoleRoute roles={['administrator']}><OperationsSettings /></RoleRoute>} />
             <Route path="/register" element={<Navigate to="/visitors/register" replace />} />
             <Route path="/visitors/register" element={<RoleRoute roles={['administrator', 'receptionist']}><Register /></RoleRoute>} />
             <Route path="/check-in" element={<RoleRoute roles={['receptionist']}><VisitDesk /></RoleRoute>} />
+            <Route path="/appointments" element={<RoleRoute roles={['receptionist']}><Appointments /></RoleRoute>} />
+            <Route path="/my-visitors" element={<RoleRoute roles={['employee']}><EmployeeVisitorTools /></RoleRoute>} />
             <Route path="/visitors" element={<RoleAwareVisitors />} />
+            <Route path="/visitors/:id/pass" element={<VisitorPass />} />
             <Route path="/reports" element={<RoleRoute roles={['administrator']}><Reports /></RoleRoute>} />
             <Route path="/activity" element={<RoleRoute roles={['administrator', 'receptionist', 'employee']}><ActivityHistory /></RoleRoute>} />
           </Route>

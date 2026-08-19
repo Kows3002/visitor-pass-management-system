@@ -10,6 +10,11 @@ A production-oriented MERN application for managing workplace visitors from regi
 - Visitor registration with frontend and backend validation
 - Employee approval, rejection, and remarks
 - Receptionist check-in and check-out workflow
+- Random employee assignment with capacity checks and automatic employee alerts
+- Administrator-controlled meeting duration applied to every new registration
+- QR visitor passes with automatic email delivery, protected viewing, and PDF download
+- Reception arrival/no-arrival confirmation with employee and visitor notifications
+- Employee next-visit scheduling with automatic visitor email
 - Role-specific dashboards with weekly/monthly trends, approval outcomes, visitor movement, top hosts, and department analytics from MongoDB
 - Visitor search, combined filters, sorting, and pagination
 - Administrator reports with professionally formatted PDF and Excel export
@@ -35,13 +40,24 @@ The React application hides unavailable navigation, while the backend independen
 Receptionist registers a visitor
               |
               v
+An eligible employee is selected randomly
+and receives an automatic email alert
+              |
+              v
        Status: Pending
               |
               v
 Employee approves or rejects the request
               |
               v
-Approved visitor is checked in by Receptionist
+Approved visitor receives a QR PDF pass by email
+              |
+              v
+Reception confirms Arrived or Not Arrived
+              |
+              v
+Arrived visitor alerts the assigned employee
+and can be checked in by Receptionist
               |
               v
        Status: Checked In
@@ -173,6 +189,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017/visitor_pass
 JWT_SECRET=replace-with-a-long-random-secret
 JWT_EXPIRES_IN=8h
 CLIENT_URL=http://localhost:5173
+PUBLIC_APP_URL=http://localhost:5173
 APP_TIMEZONE=Asia/Kolkata
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
@@ -195,6 +212,7 @@ TWILIO_FROM_NUMBER=
 | `JWT_SECRET` | Yes | Long private value used to sign authentication tokens. |
 | `JWT_EXPIRES_IN` | No | Standard JWT duration such as `8h`. |
 | `CLIENT_URL` | Yes | Exact allowed browser origin. Multiple origins may be comma-separated. Do not include a path. |
+| `PUBLIC_APP_URL` | Production | Public frontend origin encoded into visitor-pass QR verification links. Falls back to the deployed HTTPS origin in `CLIENT_URL`. |
 | `APP_TIMEZONE` | No | IANA timezone used to group dashboard analytics (defaults to `Asia/Kolkata`). |
 | `DNS_OVER_HTTPS_URL` | No | HTTPS DNS endpoint used only when the runtime cannot resolve Atlas SRV records. |
 | `SMTP_HOST` | For email | SMTP server hostname. Use `smtp.gmail.com` for Gmail. |
@@ -229,6 +247,7 @@ Open the Render web service and configure:
 ```dotenv
 NODE_ENV=production
 CLIENT_URL=http://localhost:5173,https://visitor-pass-management-system-five.vercel.app
+PUBLIC_APP_URL=https://visitor-pass-management-system-five.vercel.app
 MONGODB_URI=your-mongodb-connection-string
 JWT_SECRET=your-long-private-jwt-secret
 JWT_EXPIRES_IN=8h
@@ -313,11 +332,10 @@ Run commands from the relevant folder:
 | `server` | `npm test` | Run server tests |
 | `client` | `npm run dev` | Start the Vite development server |
 | `client` | `npm run lint` | Run frontend lint checks |
-| `client` | `npm run build` | Create a production Vite bundle |
 
 ### Automated verification
 
-`npm test` in `server` covers visitor date and time rules, duplicate and active-visit prevention, the employee pending limit, approval ownership, allowed status transitions, repeated check-in prevention, checkout ordering, atomic check-in, notification delivery states, standardized API responses, partial bulk-approval results, and audit CSV generation. Frontend changes are checked with ESLint and the Vite production build.
+`npm test` in `server` covers visitor date and time rules, duplicate and active-visit prevention, approval ownership, allowed status transitions, repeated check-in prevention, checkout ordering, atomic check-in, notification delivery states, standardized API responses, partial bulk-approval results, and audit CSV generation. Frontend changes are checked with ESLint.
 
 MongoDB indexes are aligned with visitor status/date queues, employee and department reports, check-in/check-out timestamps, review timestamps, user and employee lists, and activity queries by performer, visitor, action, role, and creation time. Unique visitor identity/date indexes provide database-level duplicate protection.
 
@@ -365,6 +383,8 @@ Login request:
 | POST | `/api/departments` | Administrator | Create a department |
 | GET | `/api/employee-options` | Administrator, Receptionist | Find active linked employees for visitor registration |
 
+Visitor registration no longer accepts a manually selected employee. The API randomly selects an active, linked employee and excludes employees who already have three pending requests.
+
 ### Visitors
 
 | Method | Endpoint | Access | Description |
@@ -379,6 +399,11 @@ Login request:
 | POST | `/api/visitors/:id/cancel` | Receptionist, Administrator | Cancel a pending or approved request |
 | POST | `/api/visitors/:id/checkin` | Receptionist | Check in an approved visitor |
 | POST | `/api/visitors/:id/checkout` | Receptionist | Check out a checked-in visitor |
+| POST | `/api/visitors/:id/arrival` | Receptionist | Mark today's appointment as `arrived` or `not_arrived` and send notifications |
+| POST | `/api/visitors/:id/next-visit` | Employee, Administrator | Store a future visiting date and email the visitor |
+| GET | `/api/visitors/:id/pass` | Authenticated, role scoped | View an approved visitor pass |
+| GET | `/api/visitors/:id/pass/pdf` | Authenticated, role scoped | Download an approved visitor pass PDF |
+| GET | `/api/passes/verify/:code` | Public | Verify a non-sensitive QR pass reference |
 | POST | `/api/visitors/bulk/approve` | Administrator | Approve up to 50 selected pending requests with per-record results |
 | POST | `/api/visitors/bulk/export` | Administrator | Export up to 500 selected visitors as an Excel workbook |
 
@@ -395,6 +420,8 @@ Free-text search covers visitor details and the host employee's name or email. E
 | Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
 | GET | `/api/dashboard` | Authenticated | Return role-specific live dashboard data |
+| GET | `/api/settings` | Authenticated | Read meeting duration and pass contact settings |
+| PUT | `/api/settings` | Administrator | Update global meeting duration and pass contact details |
 | GET | `/api/reports` | Administrator | Return filtered report summaries, charts, and rows |
 | GET | `/api/reports/export/pdf` | Administrator | Export the selected report as PDF |
 | GET | `/api/reports/export/excel` | Administrator | Export the selected report as Excel |
@@ -453,6 +480,31 @@ Typical status codes:
 - `409` business-rule conflict
 - `422` request validation failed
 - `500` unexpected server error
+
+## Checking the additional visitor workflow
+
+Use real employee accounts with active Employee profiles, linked User records, departments, and valid email addresses.
+
+1. Sign in as Administrator, open **Operations settings**, set the meeting duration and reception contact details, and save.
+2. Sign in as Receptionist and register a visitor with a reachable email address. There is no host picker. Confirm the response names a randomly assigned employee and that the employee receives the assignment email.
+3. Register several visitors and verify assignments are not tied to registration order. Employees with three pending requests must not receive another assignment.
+4. Sign in as the assigned Employee, open **My visitor requests**, and approve the request. Confirm the visitor receives the approval email and a PDF pass attachment containing a QR code.
+5. Open **My visitors & passes** as the employee, or **Today's appointments** as reception, and open the pass. Download its PDF and scan the QR code. The public verification page should show only pass status and appointment information, not government ID or other sensitive data.
+6. In **My visitors & passes**, choose a future next visiting date and send it. Confirm the visitor receives the date by email.
+7. On the scheduled date, open **Today's appointments** as Receptionist. Verify the appointment, arrived, newly registered, and inside counters use live API data.
+8. Mark the visitor **Arrived**. Confirm the employee receives the arrival alert. Then open **Check in** and check in the visitor. The API will reject check-in before arrival confirmation.
+9. For another appointment, choose **Not arrived**. Confirm the employee receives the reminder and the visitor receives the no-arrival email.
+10. Check out an arrived visitor and verify the dashboard, visitor history, and activity history update.
+
+Email results are returned in API response metadata and logged by the server with masked recipient addresses. Workflow changes remain saved if SMTP delivery fails.
+
+### Employee alert and QR troubleshooting
+
+- Employee alerts resolve the email from the linked Employee profile first. If the linked login account uses a different address, that address is copied on the notification. Keep both records linked and both email addresses current in **People & Access**.
+- Assignment, arrived, and not-arrived responses include notification delivery metadata. Render logs show the event name, masked recipient, provider, and message identifier without exposing SMTP credentials.
+- Set `PUBLIC_APP_URL` to the deployed Vercel origin on Render. As a safety fallback, pass generation selects the first non-local HTTPS origin in `CLIENT_URL` instead of encoding localhost.
+- Pass PDFs contain the verification URL at generation time. Download the pass again after changing `PUBLIC_APP_URL`; an already downloaded PDF cannot have its embedded QR code changed.
+- After changing Render variables, deploy the latest backend and restart the service. Redeploy Vercel when frontend files or `VITE_API_URL` change.
 
 ## Security controls
 

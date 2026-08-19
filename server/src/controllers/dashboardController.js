@@ -127,6 +127,8 @@ exports.summary = async (req, res, next) => {
       Visitor.countDocuments({ ...todayScope, status: { $in: ['pending', 'approved'] } }),
       Visitor.countDocuments({ ...todayScope, status: 'approved' }),
       Visitor.countDocuments({ checkedOutAt: { $gte: start, $lt: end } }), Visitor.countDocuments({ status: 'checked_in' }),
+      Visitor.countDocuments({ ...todayScope, arrivalStatus: 'arrived' }),
+      Visitor.countDocuments({ createdAt: { $gte: start, $lt: end } }),
     ]) : Promise.all([
       Visitor.countDocuments({ ...scope, status: 'pending' }),
       Visitor.countDocuments({ ...reviewedToday, status: 'approved' }), Visitor.countDocuments({ ...reviewedToday, status: 'rejected' }),
@@ -144,7 +146,7 @@ exports.summary = async (req, res, next) => {
       Activity.find(role === 'employee' ? { performedBy: req.user._id } : {}).populate('performedBy', 'name role').populate('visitor', 'visitorName status').sort({ createdAt: -1 }).limit(8),
       role === 'administrator' ? loadAdminAnalytics() : Promise.resolve(null),
     ]);
-    const keys = role === 'administrator' ? ['totalEmployees', 'todayVisitors', 'visitorsInside', 'pendingRequests', 'todayCheckIns', 'approvedToday'] : role === 'receptionist' ? ['todayVisitors', 'scheduledVisitors', 'pendingCheckIns', 'todayCheckOuts', 'visitorsInside'] : ['pendingApprovals', 'approvedToday', 'rejectedToday'];
+    const keys = role === 'administrator' ? ['totalEmployees', 'todayVisitors', 'visitorsInside', 'pendingRequests', 'todayCheckIns', 'approvedToday'] : role === 'receptionist' ? ['todayVisitors', 'scheduledVisitors', 'pendingCheckIns', 'todayCheckOuts', 'visitorsInside', 'arrivedToday', 'newRegistrationsToday'] : ['pendingApprovals', 'approvedToday', 'rejectedToday'];
     const counts = Object.fromEntries(keys.map((key, index) => [key, countValues[index]]));
     const commonCharts = { daily: daily.map((row) => ({ date: row._id, value: row.value })), statuses: statuses.map((row) => ({ name: row._id, value: row.value })) };
     const charts = role === 'administrator' ? { ...analytics, ...commonCharts } : { monthly: monthlyRows.map((row) => ({ month: row._id, visitors: row.visitors, approved: row.approved })), topEmployees: [], ...commonCharts };

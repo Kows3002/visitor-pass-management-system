@@ -39,11 +39,13 @@ router.post('/', authorizeRoles('receptionist', 'administrator'), upload.single(
   body('companyName').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
   body('governmentId').trim().isLength({ min: 3, max: 100 }),
   body('purpose').trim().isLength({ min: 3, max: 300 }),
-  body('employee').isMongoId(),
   body('visitDate').isISO8601({ strict: true }),
   body('expectedArrival').matches(/^([01]\d|2[0-3]):[0-5]\d$/),
-  body('expectedDeparture').matches(/^([01]\d|2[0-3]):[0-5]\d$/),
 ], validate, controller.create);
+router.get('/:id/pass', id, validate, controller.pass);
+router.get('/:id/pass/pdf', id, validate, controller.passPdf);
+router.post('/:id/arrival', authorizeRoles('receptionist'), [...id, body('status').isIn(['arrived', 'not_arrived'])], validate, controller.confirmArrival);
+router.post('/:id/next-visit', authorizeRoles('employee', 'administrator'), [...id, body('nextVisitDate').isISO8601({ strict: true })], validate, controller.setNextVisit);
 router.post('/:id/remarks', authorizeRoles('employee', 'administrator'), [...id, body('remarks').trim().isLength({ min: 2, max: 1000 })], validate, controller.remark);
 router.post('/:id/approve', authorizeRoles('employee', 'administrator'), [...id, body('remarks').optional({ checkFalsy: true }).trim().isLength({ max: 1000 })], validate, controller.action('approve'));
 router.post('/:id/reject', authorizeRoles('employee', 'administrator'), [...id, body('remarks').trim().isLength({ min: 2, max: 1000 })], validate, controller.action('reject'));

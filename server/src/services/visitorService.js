@@ -1,7 +1,8 @@
 const Visitor = require('../models/Visitor');
-const Employee = require('../models/Employee');
 const AppError = require('../utils/appError');
 const { localDateKey, localDayRange } = require('../utils/dateRange');
+const assignment = require('./assignmentService');
+const settings = require('./settingService');
 
 const ACTIVE_STATUSES = ['approved', 'checked_in'];
 const dayBounds = (value) => {
@@ -19,20 +20,9 @@ exports.create = async (data, user) => {
   const [start, end] = dayBounds(data.visitDate);
   const [today] = dayBounds(localDateKey());
   if (start < today) throw new AppError('Visit date cannot be earlier than today', 422, 'PAST_VISIT_DATE');
-  if (data.expectedDeparture <= data.expectedArrival) throw new AppError('Expected exit must be later than expected arrival', 422, 'INVALID_VISIT_WINDOW');
   if (+start === +today && new Date(`${String(data.visitDate).slice(0, 10)}T${data.expectedArrival}:00`) < new Date()) {
     throw new AppError("Today's arrival time cannot be earlier than the current time", 422, 'PAST_ARRIVAL_TIME');
   }
-
-  const host = await Employee.findOne({ _id: data.employee, status: 'active' })
-    .populate('userId', 'name email role active')
-    .populate('user', 'name email role active');
-  if (!host) throw new AppError('The selected employee is not available', 422, 'INVALID_EMPLOYEE');
-  const hostUser = host.userId || host.user;
-  if (!hostUser || hostUser.role !== 'employee' || !hostUser.active) {
-    throw new AppError('The selected employee does not have an active linked login account', 422, 'EMPLOYEE_ACCOUNT_REQUIRED');
-  }
-  if (!host.department) throw new AppError('The selected employee does not have a department assigned', 422, 'EMPLOYEE_DEPARTMENT_REQUIRED');
 
   const identity = identityFilter(data);
   if (await Visitor.exists({ ...identity, status: { $in: ACTIVE_STATUSES } })) {
@@ -41,9 +31,10 @@ exports.create = async (data, user) => {
   if (await Visitor.exists({ ...identity, visitDate: { $gte: start, $lt: end } })) {
     throw new AppError('This visitor is already registered for the selected date', 409, 'DUPLICATE_VISIT');
   }
-  if (await Visitor.countDocuments({ employee: hostUser._id, status: 'pending' }) >= 3) {
-    throw new AppError('This employee already has three pending visitor requests', 409, 'EMPLOYEE_PENDING_LIMIT');
-  }
+  const [{ profile: host, user: hostUser }, operations] = await Promise.all([assignment.selectRandomEmployee(), settings.get()]);
+  const scheduledStart = new Date(`${String(data.visitDate).slice(0, 10)}T${data.expectedArrival}:00`);
+  const scheduledEndAt = new Date(scheduledStart.getTime() + operations.meetingDurationMinutes * 60000);
+  const expectedDeparture = `${String(scheduledEndAt.getHours()).padStart(2, '0')}:${String(scheduledEndAt.getMinutes()).padStart(2, '0')}`;
   return Visitor.create({
     ...data,
     governmentId: String(data.governmentId).trim().toUpperCase(),
@@ -51,6 +42,11 @@ exports.create = async (data, user) => {
     employee: hostUser._id,
     department: host.department,
     visitDate: start,
+    expectedDeparture,
+    scheduledEndAt,
+    meetingDurationMinutes: operations.meetingDurationMinutes,
+    assignmentMethod: 'random',
+    assignedAt: new Date(),
     createdBy: user._id,
   });
 };
@@ -76,6 +72,9 @@ exports.transition = async (id, action, user, remarks) => {
       throw new AppError(`${current.status === 'rejected' ? 'Rejected' : 'Cancelled'} visitors cannot check in`, 409, 'CHECKIN_NOT_ALLOWED');
     }
     throw new AppError(`Cannot ${action} a ${current.status.replace('_', ' ')} visit`, 409, 'INVALID_TRANSITION');
+  }
+  if (action === 'checkin' && current.arrivalStatus !== 'arrived') {
+    throw new AppError('Reception must confirm that the visitor has arrived before check-in', 409, 'ARRIVAL_CONFIRMATION_REQUIRED');
   }
   if (action === 'approve') {
     const otherActiveVisit = await Visitor.exists({
@@ -105,6 +104,29 @@ exports.transition = async (id, action, user, remarks) => {
   const visit = await Visitor.findOneAndUpdate(filter, { $set: set }, { returnDocument: 'after', runValidators: true });
   if (visit) return visit;
   throw new AppError('The visitor status changed while this action was being processed. Refresh and try again.', 409, 'CONCURRENT_TRANSITION');
+};
+
+exports.confirmArrival = async (id, status, user) => {
+  const current = await Visitor.findById(id);
+  if (!current) throw new AppError('Visitor request not found', 404, 'NOT_FOUND');
+  const { start, end } = localDayRange();
+  if (current.visitDate < start || current.visitDate >= end) throw new AppError('Arrival can only be confirmed on the scheduled visit date', 409, 'NOT_SCHEDULED_TODAY');
+  if (!['approved', 'pending'].includes(current.status)) throw new AppError('Arrival cannot be updated for this visitor status', 409, 'INVALID_ARRIVAL_STATUS');
+  return Visitor.findOneAndUpdate(
+    { _id: id, status: current.status },
+    { $set: { arrivalStatus: status, arrivalConfirmedAt: new Date(), arrivalConfirmedBy: user._id } },
+    { returnDocument: 'after', runValidators: true },
+  );
+};
+
+exports.setNextVisit = async (id, date, user) => {
+  const current = await Visitor.findById(id);
+  if (!current) throw new AppError('Visitor request not found', 404, 'NOT_FOUND');
+  if (user.role === 'employee' && String(current.employee) !== String(user._id)) throw new AppError('This request belongs to another employee', 403, 'FORBIDDEN');
+  const { start } = localDayRange(date);
+  const { start: tomorrow } = localDayRange(new Date(Date.now() + 86400000));
+  if (start < tomorrow) throw new AppError('Next visiting date must be a future date', 422, 'INVALID_NEXT_VISIT_DATE');
+  return Visitor.findByIdAndUpdate(id, { $set: { nextVisitDate: start, nextVisitSetBy: user._id } }, { returnDocument: 'after', runValidators: true });
 };
 
 exports.addRemark = async (id, user, remarks) => {

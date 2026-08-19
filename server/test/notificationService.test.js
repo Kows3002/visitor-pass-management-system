@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const notificationService = require('../src/services/notificationService');
+const Employee = require('../src/models/Employee');
 
 const smtpKeys = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'NOTIFICATION_FROM_EMAIL', 'NOTIFICATION_REPLY_TO'];
 const visitor = () => ({
@@ -54,6 +55,24 @@ test('rejection email includes the decision and visitor remarks', async () => {
   assert.match(mail.subject, /rejected/i);
   assert.match(mail.text, /Host unavailable/);
   assert.equal(result.delivered, 1);
+  notificationService._private.setTransporterForTests(undefined);
+  restoreEnvironment(previous);
+});
+
+test('employee alert uses the linked Employee profile email and copies a different login email', async () => {
+  const previous = preserveEnvironment();
+  const originalFindOne = Employee.findOne;
+  configureSmtp();
+  Employee.findOne = () => ({ select() { return this; }, async lean() { return { email: 'profile@example.com', fullName: 'Host Employee', status: 'active' }; } });
+  let mail;
+  notificationService._private.setTransporterForTests({ sendMail: async (message) => { mail = message; return { messageId: 'employee-123' }; } });
+  const target = visitor();
+  target.employee = { _id: '507f1f77bcf86cd799439011', name: 'Host Employee', email: 'login@example.com' };
+  const result = await notificationService.sendEmployeeAssignmentAlert(target);
+  assert.equal(mail.to, 'profile@example.com');
+  assert.equal(mail.cc, 'login@example.com');
+  assert.equal(result.status, 'delivered');
+  Employee.findOne = originalFindOne;
   notificationService._private.setTransporterForTests(undefined);
   restoreEnvironment(previous);
 });

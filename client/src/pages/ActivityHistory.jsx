@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
-const visitorActions = new Set(['created', 'approved', 'rejected', 'cancelled', 'checked_in', 'checked_out', 'remarks_added'])
+const visitorActions = new Set(['created', 'approved', 'rejected', 'cancelled', 'checked_in', 'checked_out', 'remarks_added', 'arrival_confirmed', 'not_arrived', 'next_visit_scheduled'])
 const accountActions = new Set(['login', 'password_changed', 'user_created', 'user_deleted'])
 const actionCategories = [
   ['', 'All'],
@@ -34,6 +34,9 @@ const copy = {
   employee_deleted: ['Employee Deleted', 'An employee profile was removed.'],
   remarks_added: ['Remark Added', 'Additional context was added to the visitor record.'],
   login: ['User Signed In', 'A secure workspace session was started.'],
+  arrival_confirmed: ['Arrival Confirmed', 'Reception confirmed that the visitor arrived and alerted the employee.'],
+  not_arrived: ['Visitor Not Arrived', 'Reception recorded a missed appointment and sent notifications.'],
+  next_visit_scheduled: ['Next Visit Scheduled', 'The employee set and emailed the next visiting date.'],
 }
 
 export default function ActivityHistory() {

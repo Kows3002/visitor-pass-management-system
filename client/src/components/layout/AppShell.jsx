@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FiActivity, FiArrowLeft, FiBarChart2, FiChevronLeft, FiGrid, FiKey, FiLogIn, FiLogOut, FiMenu, FiMoon, FiPlus, FiSun, FiUsers, FiX } from 'react-icons/fi'
+import { FiActivity, FiArrowLeft, FiBarChart2, FiCalendar, FiChevronLeft, FiClock, FiGrid, FiKey, FiLogIn, FiLogOut, FiMenu, FiMoon, FiPlus, FiSun, FiUsers, FiX } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 
 const activity = ['/activity', FiActivity, 'Activity']
 const navByRole = {
-  administrator: [['/dashboard/admin', FiGrid, 'Overview'], ['/users', FiUsers, 'People & access'], ['/visitors', FiUsers, 'Visitor Requests'], ['/reports', FiBarChart2, 'Reports'], activity],
-  receptionist: [['/dashboard/receptionist', FiGrid, 'Receptionist dashboard'], ['/visitors/register', FiPlus, 'Register visitor'], ['/visitors?status=approved', FiLogIn, 'Check in'], ['/visitors?status=checked_in', FiLogOut, 'Check out'], ['/visitors?today=true', FiUsers, "Today's visitors"], activity],
-  employee: [['/dashboard/employee', FiGrid, 'My dashboard'], ['/visitors?status=pending', FiUsers, 'My visitor requests'], ['/visitors', FiUsers, 'View my visitors'], activity],
+  administrator: [['/dashboard/admin', FiGrid, 'Overview'], ['/users', FiUsers, 'People & access'], ['/visitors', FiUsers, 'Visitor Requests'], ['/reports', FiBarChart2, 'Reports'], activity, ['/settings', FiClock, 'Operations settings']],
+  receptionist: [['/dashboard/receptionist', FiGrid, 'Receptionist dashboard'], ['/appointments', FiClock, "Today's appointments"], ['/visitors/register', FiPlus, 'Register visitor'], ['/visitors?status=approved', FiLogIn, 'Check in'], ['/visitors?status=checked_in', FiLogOut, 'Check out'], activity],
+  employee: [['/dashboard/employee', FiGrid, 'My dashboard'], ['/visitors?status=pending', FiUsers, 'My visitor requests'], ['/my-visitors', FiCalendar, 'My visitors & passes'], activity],
 }
 
 const primaryPaths = new Set([
@@ -20,6 +20,9 @@ const primaryPaths = new Set([
   '/reports',
   '/activity',
   '/change-password',
+  '/settings',
+  '/appointments',
+  '/my-visitors',
 ])
 
 export default function AppShell() {

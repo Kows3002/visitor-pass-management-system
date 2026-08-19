@@ -1,8 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Visitor = require('../src/models/Visitor');
-const Employee = require('../src/models/Employee');
 const service = require('../src/services/visitorService');
+const assignment = require('../src/services/assignmentService');
+const settings = require('../src/services/settingService');
 const { localDateKey } = require('../src/utils/dateRange');
 
 const originals = {
@@ -11,7 +12,8 @@ const originals = {
   visitorCreate: Visitor.create,
   visitorFindById: Visitor.findById,
   visitorUpdate: Visitor.findOneAndUpdate,
-  employeeFindOne: Employee.findOne,
+  selectRandomEmployee: assignment.selectRandomEmployee,
+  getSettings: settings.get,
 };
 const restore = () => {
   Visitor.exists = originals.visitorExists;
@@ -19,7 +21,8 @@ const restore = () => {
   Visitor.create = originals.visitorCreate;
   Visitor.findById = originals.visitorFindById;
   Visitor.findOneAndUpdate = originals.visitorUpdate;
-  Employee.findOne = originals.employeeFindOne;
+  assignment.selectRandomEmployee = originals.selectRandomEmployee;
+  settings.get = originals.getSettings;
 };
 test.afterEach(restore);
 
@@ -30,27 +33,17 @@ const dateOffset = (days) => {
 };
 const data = (overrides = {}) => ({
   visitorName: 'Test Visitor', phone: '+919876543210', email: 'visitor@example.com',
-  governmentId: 'gov-100', purpose: 'Project meeting', employee: 'employee-profile-1',
-  visitDate: dateOffset(1), expectedArrival: '10:00', expectedDeparture: '11:00', ...overrides,
+  governmentId: 'gov-100', purpose: 'Project meeting', visitDate: dateOffset(1), expectedArrival: '10:00', ...overrides,
 });
 const host = {
   department: 'department-1',
   userId: { _id: 'host-user-1', role: 'employee', active: true },
 };
-const stubHost = (value = host) => {
-  Employee.findOne = () => {
-    const query = { populate() { return query; }, then(resolve) { resolve(value); } };
-    return query;
-  };
-};
+const stubHost = (value = host) => { assignment.selectRandomEmployee = async () => ({ profile: value, user: value.userId }); settings.get = async () => ({ meetingDurationMinutes: 30 }); };
 const expectCode = async (promise, code) => assert.rejects(promise, (error) => error.code === code);
 
 test('registration rejects a past visit date', async () => {
   await expectCode(service.create(data({ visitDate: dateOffset(-1) }), { _id: 'reception-1' }), 'PAST_VISIT_DATE');
-});
-
-test('registration rejects an arrival window whose departure is not later', async () => {
-  await expectCode(service.create(data({ expectedArrival: '11:00', expectedDeparture: '10:00' }), { _id: 'reception-1' }), 'INVALID_VISIT_WINDOW');
 });
 
 test('registration rejects a visitor who already has an active visit', async () => {
@@ -66,11 +59,17 @@ test('registration rejects a duplicate identity on the same visit date', async (
   await expectCode(service.create(data(), { _id: 'reception-1' }), 'DUPLICATE_VISIT');
 });
 
-test('registration enforces the host pending-request limit', async () => {
+test('registration applies the administrator duration and random employee assignment', async () => {
   stubHost();
   Visitor.exists = async () => false;
-  Visitor.countDocuments = async () => 3;
-  await expectCode(service.create(data(), { _id: 'reception-1' }), 'EMPLOYEE_PENDING_LIMIT');
+  let saved;
+  Visitor.create = async (value) => { saved = value; return value; };
+  await service.create(data({ expectedArrival: '10:00' }), { _id: 'reception-1' });
+  assert.equal(saved.employee, 'host-user-1');
+  assert.equal(saved.department, 'department-1');
+  assert.equal(saved.meetingDurationMinutes, 30);
+  assert.equal(saved.expectedDeparture, '10:30');
+  assert.equal(saved.assignmentMethod, 'random');
 });
 
 test('approval rechecks active-visit exclusivity', async () => {
@@ -84,6 +83,11 @@ test('rejected visitors cannot check in', async () => {
   await expectCode(service.transition('visit-1', 'checkin', { _id: 'reception-1', role: 'receptionist' }), 'CHECKIN_NOT_ALLOWED');
 });
 
+test('approved visitors require receptionist arrival confirmation before check-in', async () => {
+  Visitor.findById = async () => ({ _id: 'visit-1', status: 'approved', arrivalStatus: 'unconfirmed', employee: 'host-user-1' });
+  await expectCode(service.transition('visit-1', 'checkin', { _id: 'reception-1', role: 'receptionist' }), 'ARRIVAL_CONFIRMATION_REQUIRED');
+});
+
 test('a checked-in visitor cannot check in again', async () => {
   Visitor.findById = async () => ({ _id: 'visit-1', status: 'checked_in', employee: 'host-user-1' });
   await expectCode(service.transition('visit-1', 'checkin', { _id: 'reception-1', role: 'receptionist' }), 'INVALID_TRANSITION');
@@ -95,7 +99,7 @@ test('checkout explicitly requires a time later than check-in', async () => {
 });
 
 test('successful check-in uses an atomic approved-status transition and records the timestamp', async () => {
-  Visitor.findById = async () => ({ _id: 'visit-1', status: 'approved', employee: 'host-user-1' });
+  Visitor.findById = async () => ({ _id: 'visit-1', status: 'approved', arrivalStatus: 'arrived', employee: 'host-user-1' });
   let filter;
   let update;
   Visitor.findOneAndUpdate = async (nextFilter, nextUpdate) => {

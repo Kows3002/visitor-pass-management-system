@@ -8,6 +8,7 @@ const notifications = require('../services/notificationService')
 const AppError = require('../utils/appError')
 const { queryDateRange } = require('../utils/dateRange')
 const { ok, created } = require('../utils/response')
+const passService = require('../services/passService')
 
 const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -16,7 +17,10 @@ exports.create = async (req, res, next) => {
     const photoUrl = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : undefined
     const item = await service.create({ ...req.body, photoUrl }, req.user)
     await activity.record(req, 'created', item._id, req.body.remarks)
-    created(res, item, 'Visitor registered and sent for approval')
+    await item.populate('employee', 'name email')
+    await item.populate('department', 'name code')
+    const notification = await notifications.sendEmployeeAssignmentAlert(item)
+    created(res, item, 'Visitor registered and randomly assigned for approval', { notification })
   } catch (error) {
     if (req.file) await fs.unlink(req.file.path).catch(() => {})
     next(error)
@@ -95,10 +99,56 @@ exports.action = action => async (req, res, next) => {
       await item.populate('employee', 'name email')
       await item.populate('department', 'name code')
       notification = await notifications.sendDecisionNotification(item, actionName)
+      if (action === 'approve' && item.email) {
+        try {
+          const pdf = await passService.generatePdf(item)
+          const passNotification = await notifications.sendVisitorPass(item, pdf)
+          notification.pass = passNotification
+          if (passNotification.status === 'delivered') await item.updateOne({ $set: { passEmailedAt: new Date() } })
+        } catch (passError) {
+          console.error('[notification] visitor pass generation or delivery failed', { visitorId: String(item._id), error: passError.message })
+          notification.pass = { channel: 'email', status: 'failed', reason: 'pass_generation_or_delivery_failed' }
+        }
+      }
     }
     const message = notification?.status === 'not_delivered'
       ? `Visitor ${actionName}, but no notification was delivered. Check notification configuration and server logs.`
       : `Visitor ${actionName.replace('_', ' ')}`
     ok(res, item, message, notification ? { notification } : undefined)
+  } catch (error) { next(error) }
+}
+
+exports.confirmArrival = async (req, res, next) => {
+  try {
+    const item = await service.confirmArrival(req.params.id, req.body.status, req.user)
+    await item.populate('employee', 'name email')
+    await item.populate('department', 'name code')
+    await activity.record(req, req.body.status === 'arrived' ? 'arrival_confirmed' : 'not_arrived', item._id)
+    const notification = req.body.status === 'arrived'
+      ? await notifications.sendEmployeeAssignmentAlert(item, true)
+      : await notifications.sendNotArrivedNotifications(item)
+    ok(res, item, `Visitor marked as ${req.body.status.replace('_', ' ')}`, { notification })
+  } catch (error) { next(error) }
+}
+
+exports.setNextVisit = async (req, res, next) => {
+  try {
+    const item = await service.setNextVisit(req.params.id, req.body.nextVisitDate, req.user)
+    await item.populate('employee', 'name email')
+    await activity.record(req, 'next_visit_scheduled', item._id, `Next visit: ${req.body.nextVisitDate}`)
+    const notification = await notifications.sendNextVisitNotification(item)
+    ok(res, item, 'Next visiting date saved', { notification })
+  } catch (error) { next(error) }
+}
+
+exports.pass = async (req, res, next) => {
+  try { ok(res, await passService.load(req.params.id, req.user), 'Visitor pass loaded') } catch (error) { next(error) }
+}
+
+exports.passPdf = async (req, res, next) => {
+  try {
+    const visitor = await passService.load(req.params.id, req.user)
+    const pdf = await passService.generatePdf(visitor)
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${visitor.passNumber}.pdf"`, 'Content-Length': pdf.length }).send(pdf)
   } catch (error) { next(error) }
 }
