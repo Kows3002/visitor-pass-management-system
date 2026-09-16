@@ -54,7 +54,7 @@ export default function EmployeeVisitorTools() {
     <section className="data-card"><div className="table-scroll"><table className="data-table">
       <thead><tr><th>Visitor</th><th>Visit</th><th>Status</th><th>Pass</th><th>Next visiting date</th></tr></thead>
       <tbody>{loading
-        ? <tr><td colSpan="5">Loading your assigned visitors...</td></tr>
+        ? <tr><td colSpan="5">Loading employee visitors, please wait...</td></tr>
         : items.length ? items.map((visitor) => <tr key={visitor._id}>
           <td><b>{visitor.visitorName}</b><small>{visitor.email}</small></td>
           <td>{new Date(visitor.visitDate).toLocaleDateString()}<small>{visitor.expectedArrival} - {visitor.expectedDeparture}</small></td>
