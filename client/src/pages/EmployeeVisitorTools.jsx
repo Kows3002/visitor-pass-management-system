@@ -66,7 +66,7 @@ export default function EmployeeVisitorTools() {
             <input type="date" min={tomorrow()} value={dates[visitor._id] || ''} onChange={(event) => setDates((value) => ({ ...value, [visitor._id]: event.target.value }))}/>
             <button className="secondary" disabled={busy === visitor._id} onClick={() => save(visitor)}><FiCalendar/>Send date</button>
           </div>{visitor.nextVisitDate && <small>Current: {new Date(visitor.nextVisitDate).toLocaleDateString()}</small>}</td>
-        </tr>) : <tr><td colSpan="5">No visitor records are assigned to you.</td></tr>}
+        </tr>) : <tr><td colSpan="5">No employee visitors are assigned to you.</td></tr>}
       </tbody>
     </table></div></section>
   </main>;
