@@ -23,7 +23,7 @@ export default function Login() {
     <section className="login-identity" aria-labelledby="product-name">
       <div className="login-product"><img src="/vp-mark.svg" alt="" /><span><b>Visitor Pass</b><small>Management System</small></span></div>
       <div className="entry-blueprint" aria-hidden="true"><span className="blueprint-label">ENTRY CONTROL / 01</span><div className="floor-zone zone-a"/><div className="floor-zone zone-b"/><div className="floor-zone zone-c"/><div className="route-line"><i/><i/><i/></div><div className="checkpoint"><span>RECEPTION</span><b>Access verified</b><small>Visitor record active</small></div></div>
-      <div className="identity-copy"><span>Workplace access operations</span><h1 id="product-name">Visitor access under control.</h1><p>Manage registrations, host decisions, arrivals, departures, and audit records from one accountable workplace system.</p></div>
+      <div className="identity-copy"><span>Workspace operations</span><h1 id="product-name">Visitor access under control.</h1><p>Manage registrations, host decisions, arrivals, departures, and audit records from one accountable workplace system.</p></div>
       <div className="identity-status"><i/><span>Secure system access</span><small>For authorized personnel</small></div>
     </section>
     <section className="access-form-side" aria-labelledby="login-title"><div className="access-form-wrap">
